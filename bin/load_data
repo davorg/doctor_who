@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use v5.38;
+
+use File::Basename;
+
+use DoctorWho::Schema;
+
+my @tables = qw[doctor actor doctor_actor season story episode
+                companion companion_appearance];
+
+my $data_dir = shift || 'data';
+
+load_table("$data_dir/$_.csv") for @tables;
+
+sub load_table($file) {
+  state $schema;
+
+  -e $file or die "$file does not exist\n";
+  -f $file or die "$file is not a file\n";
+  -r $file or die "Cannot read $file\n";
+
+  $schema //= DoctorWho::Schema->get_schema;
+
+  my $table_name = basename $file, '.csv';
+
+  say "Loading $table_name ...";
+
+  my $rs_name = join '', map { ucfirst } split /_/, $table_name;
+
+  my $rs = $schema->resultset($rs_name);
+
+  open my $data_fh, '<', $file or die $!;
+
+  my $header = <$data_fh>;
+  chomp $header;
+  my @headers = split /,/, $header;
+
+  while (<$data_fh>) {
+    chomp;
+    my %rec;
+    @rec{@headers} = split /,/, $_;
+    $rs->create(\%rec);
+  }
+
+  say "Done";
+}
